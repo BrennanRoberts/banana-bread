@@ -3,7 +3,7 @@
 require 'mysql'
 
 # load configuration
-require './config.rb'
+require_relative 'config.rb'
 
 ##################
 # TODO
@@ -81,7 +81,7 @@ begin
     puts "About to insert \
       #{style}-#{size}-#{color}-#{store}-#{date}-100.0-100.0-#{TRANSACTION_TYPE}-#{sku} \n"
 
-    CON.QUERY "INSERT INTO TRANSACTIONS \
+    con.query "INSERT INTO Transactions \
       (Name, Size, Color, Store, Date, Price, OrigPrice, Type, Sku) \
       VALUES(\"#{style}\", \"#{size}\", \"#{color}\", \"#{store}\", \"#{date}\", \"#{100.0}\", \"#{100.0}\", \"#{TRANSACTION_TYPE}\", \"#{sku}\")"
   }
