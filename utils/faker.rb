@@ -1,5 +1,6 @@
-#!/usr/bin/ruby
+#!/usr/bin/env ruby
 
+require 'rubygems'
 require 'mysql'
 
 # load configuration
