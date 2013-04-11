@@ -12,8 +12,8 @@ SIZES = %w[Small Medium Large XL XXL] if ! defined? SIZES
 TRANSACTION_TYPE = "sell"
 QNTY = 100
 HOST = "localhost"
-USER = "test"
-PASS = "test"
+USER = "root"
+PASS = "root"
 DB = "stussy_test"
 
 
