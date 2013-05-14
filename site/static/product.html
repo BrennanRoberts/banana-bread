@@ -3,6 +3,9 @@
   <head>
     <link rel='stylesheet' href='style.css' />
     <script src="underscore.js"></script>
+    <script src="http://code.jquery.com/jquery-2.0.0.js"></script>
+    <script src="q.js"></script>
+    <script src="backbone.js"></script>
     <script src="d3.v3.js"></script>
     <script>
     </script>
@@ -31,14 +34,16 @@
       circle {
         fill: steelblue;
       }
+
+      .filter label {
+        display: block;
+      }
     </style>
   </head>
   <body>
     <div class="product">
       <h1 class="product-name"></h1>
-      <div class="store-filter">
-        Store
-      </div>
+      <div class="filter"></div>
     </div>
     <script>
     </script>

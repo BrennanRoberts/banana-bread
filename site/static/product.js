@@ -1,5 +1,73 @@
 (function() {
-  var Data = [];
+
+  var Product = { data: [] };
+
+  var get = function(url, data) {
+    var req = new XMLHttpRequest();
+    var deferred = Q.defer();
+    var params;
+
+    if (data) {
+      params = _.map(data, function(v, k) {
+        return k + '=' + v;
+      });
+      url += '?' + params.join('&')
+    }
+
+    req.open('GET', url);
+    req.onload = function() {
+      if (req.status == 200) {
+        deferred.resolve(JSON.parse(this.responseText));
+      } else {
+        deferred.reject(new Error('request failed'));
+      }
+    };
+
+    req.send();
+    return deferred.promise;
+  };
+
+  var setProductFilter = function(splitBy) {
+    var filter = {store: '*', size: '*', color: '*'};
+    var gets = [];
+
+    if (splitBy == 'none') {
+      gets.push(getProductData(filter));
+    } else {
+      _.each(Product.attributes[splitBy], function(val) {
+        filter[splitBy] = val;
+        gets.push(getProductData(filter));
+      })
+    }
+
+    Q.all(gets).then(function(data) {
+      render(data);
+    });
+  };
+
+  var getProductAttributes = function() {
+    return get('api/product/attributes');
+  };
+
+  var getProductData = function(opts) {
+    var deferred = Q.defer();
+
+    opts = opts || {};
+    opts.color = opts.color || '*';
+    opts.size = opts.size || '*';
+    opts.store = opts.store || '*';
+
+    get('api/product/', opts).then(
+      function(data) {
+        data['sales-day'].forEach(function(d) {
+          d.date = parseDate(d.date);
+        });
+        data.filter = opts;
+        deferred.resolve(data);
+      },
+      deferred.reject);
+    return deferred.promise;
+  };
 
   var margin = { top: 20, right: 20, bottom: 30, left: 50 };
   var width = 680 - margin.left - margin.right;
@@ -36,155 +104,122 @@
   svg.append('g')
     .attr('class', 'y axis');
 
-  var render = function() {
-    data = Data;
-    color.domain(d3.range(data.length));
-    x.domain([
-      d3.min(data, function(d) {
-        return d3.min(d['sales-day'], function(s) { return s.date; });
-      }),
-      d3.max(data, function(d) {
-        return d3.max(d['sales-day'], function(s) { return s.date; });
-      })
-    ]);
+  // render accepts something like:
+  // [
+  //   {
+  //     filter: {
+  //       store: 'los-angeles',
+  //       color: '*',
+  //       size: '*'
+  //     },
+  //     sales-day: [
+  //        {
+  //          date: Y-m-d
+  //          sales: int
+  //        }
+  //     ],
+  //     inventory-day: [
+  //       {
+  //        date: Y-m-d
+  //        inventory: int
+  //       }
+  //     ]
+  //   },
+  //   {
+  //     filter: {
+  //      store: 'nyc',
+  //      color: '*',
+  //      size: '*'
+  //     },
+  //     ...
+  // ];
 
-    y.domain([
-      d3.min(data, function(d) {
-        return d3.min(d['sales-day'], function(s) { return s.sales; });
-      }),
-      d3.max(data, function(d) {
-        return d3.max(d['sales-day'], function(s) { return s.sales; });
-      })
-    ]);
+  var render = function(data) {
+    var renderSalesGraph = function(data) {
+      color.domain(d3.range(data.length));
+      x.domain([
+        d3.min(data, function(d) {
+          return d3.min(d['sales-day'], function(s) { return s.date; });
+        }),
+        d3.max(data, function(d) {
+          return d3.max(d['sales-day'], function(s) { return s.date; });
+        })
+      ]);
 
-    d3.transition(svg).select('.x.axis').call(xAxis);
-    d3.transition(svg).select('.y.axis').call(yAxis);
+      y.domain([
+        d3.min(data, function(d) {
+          return d3.min(d['sales-day'], function(s) { return s.sales; });
+        }),
+        d3.max(data, function(d) {
+          return d3.max(d['sales-day'], function(s) { return s.sales; });
+        })
+      ]);
 
-    var g = svg.selectAll('.wtf')
-        .data(data)
-      .enter().append('g')
-        .attr('class', 'wtf');
+      d3.transition(svg).select('.x.axis').call(xAxis);
+      d3.transition(svg).select('.y.axis').call(yAxis);
 
-    g.append('path')
-      .attr('class', 'line')
-      .attr('d', function(d) { return line(d['sales-day']); })
-      .style('stroke', function(d, i) { return color(i); });
-  };
+      var sku = svg.selectAll('.sku')
+          .data(data);
 
-  var load = function(opts, callback) {
-    var req = new XMLHttpRequest();
-    var params = _.map(opts, function(v, k) {
-      return k + '=' + v;
-    });
+      sku.enter().append('path')
+        .attr('class', 'sku line')
+        .style('stroke', function(d, i) { return color(i); });
 
-    req.open('GET', 'api/product/?' + params.join('&'));
-    req.onload = function() {
-      var data = JSON.parse(this.responseText);
-      data.forEach(function(d) {
-        d.date = parseDate(d.date);
-      });
+      sku.attr('d', function(d) { return line(d['sales-day']); })
 
-      callback(data);
+      sku.exit().remove();
     };
-    req.send();
+    renderSalesGraph(data);
   };
 
-  var loadDataFor = function(opts) {
-    opts = opts || {};
-    opts.color = opts.color || '*';
-    opts.size = opts.size || '*';
-    opts.store = opts.store || '*';
-    load(opts, function(d) {
-      opts['sales-day'] = d;
-      addData(opts);
-      render();
-    });
-  };
+  var RadioSelector = Backbone.View.extend({
+    events: {
+      'change': 'changeHandler'
+    },
 
-  var addData = function(d) {
-    var exists = _.find(Data, function(item) {
-      return item.color === d.color &&
-             item.size === d.size &&
-             item.store == d.store;
-    });
+    initialize: function() {
+      this.keys = this.options.keys;
+      this.callback = this.options.callback;
+      this.$el.addClass('radio-selector');
+      this.render();
+    },
 
-    if (exists) exists['sales-day'] = d['sales-day'];
-    else Data.push(d);
-  };
-
-  var adjust = function() {
-    _.each(filter, function(list, key) {
-      _.each(list, function(v) {
-        var opts = {};
-        opts[key] = v;
-        loadDataFor(opts);
-      });
-    });
-  };
-
-  var StoreFilter = function(opts) {
-    this.el = opts.el;
-
-    var labels = d3.select(this.el).selectAll('label')
-      .data(opts.stores);
-
-    labels.enter().append('label');
-    labels.exit().remove();
-
-    this.inputs = labels.append('input')
-      .attr('type', 'checkbox')
-      .on('change', _.bind(this.changeHandler, this));
-    labels.append('span').text(String)
-  };
-
-  StoreFilter.prototype.changeHandler = function() {
-    var values = this.inputs.filter(':checked').data();
-    filter.stores = values;
-    adjust();
-  };
-
-  var ProductFilter = function(opts) {
-    this.el = opts.el;
-    this.params = opts.params;
-    this.render();
-  };
-
-  ProductFilter.prototype = {
     render: function() {
-      var keys = this.params.map(function(p) { return p.key; });
-      keys.unshift('none');
-      var labels = d3.select(this.el).selectAll('label').data(keys);
-      labels.enter().append('label');
-      labels.exit().remove();
+      var html = '';
 
-      this.inputs = labels.append('input')
-        .attr('type', 'radio')
-        .attr('name', 'blah')
-        .on('change', _.bind(this.changeHandler, this));
-      labels.append('span').text(String);
+      _.each(this.keys, function(key) {
+        html += '<label><input type="radio" name="blah" value="'+key.value+'"/>'+key.label+'</label>';
+      });
+      this.$el.html(html);
     },
 
     changeHandler: function() {
-      var value = this.inputs.filter(':checked').data()[0];
-      var filter = {};
-
-      this.params.forEach(function(p) {
-
-      });
+      var val = this.$(':checked').val()
+      this.callback(val);
     }
-  };
 
-  var filter = {};
-
-  new ProductFilter({
-    el: document.querySelector('.store-filter'),
-    params: [
-      { key: 'stores', value: ['web', 'Los Angeles', 'New York', 'Honolulu'] },
-      { key: 'colors', value: ['red', 'yellow', 'blue'] },
-      { key: 'sizes', value: ['small', 'medium', 'large'] }
-    ],
-    allowCombinations: false
   });
 
-  loadDataFor();
+  var createSelector = function(attributes) {
+    var keys = [
+      {label: 'None', value: 'none'},
+      {label: 'Stores | '+attributes.store.join(' '), value: 'store'},
+      {label: 'Colors | '+attributes.color.join(' '), value: 'color'},
+      {label: 'Sizes | '+attributes.size.join(' '), value: 'size'}
+    ];
+
+    new RadioSelector({
+      el: $('.filter'),
+      keys: keys,
+      callback: setProductFilter
+    });
+  };
+
+  getProductAttributes().then(function(data) {
+    Product.attributes = data;
+    createSelector(data);
+  });
+
+  setProductFilter('none');
 })();
+

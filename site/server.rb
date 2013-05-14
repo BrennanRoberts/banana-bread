@@ -12,13 +12,17 @@ get '/api/products' do
   params[:offset]||= 0
   params[:limit] ||= 10
   puts params.inspect
-  return random_products_data(params).to_json
+  random_products_data(params).to_json
 end
 
 get '/api/product/' do
   params[:from] ||= Date.today - 10
   params[:to] ||= Date.today
-  return random_product_data(params).to_json
+  random_product_data(params).to_json
+end
+
+get '/api/product/attributes' do
+  random_product_attributes.to_json
 end
 
 def random_products_data(opts = {})
@@ -50,10 +54,25 @@ def random_products_data(opts = {})
     end
   end
 
-  return list
+  list
 end
 
 def random_product_data(opts)
+  {
+    :"sales-day" => random_product_sales(opts),
+    :"inventory-day" => random_product_inventory(opts)
+  }
+end
+
+def random_product_attributes
+  {
+    :store => %w(la nyc),
+    :size => %w(s m l xl),
+    :color => ['black', 'blue', 'red']
+  }
+end
+
+def random_product_sales(opts)
   dates = (opts[:from]..opts[:to])
   data = dates.map do |day|
     { :date => day, :sales => Random.rand(100) }
@@ -61,28 +80,11 @@ def random_product_data(opts)
   data
 end
 
-def random_transaction_data
-  trans = []
-  days = 10
-  today = Date.today
-  dates = ((today - days)..today)
-  stores = ['Los Angeles', 'Stussy.com', 'New York', 'Las Vegas']
-  colors = ['black', 'blue', 'red']
-  sizes = ['small', 'medium', 'large', 'x-large', 'xx-large']
-
-  dates.each do |day|
-    (Random.rand(10)).times do
-      trans << {
-        :style => 'Stussy x CLOT Snakeskin Tee',
-        :store => stores.sample,
-        :colors => colors.sample,
-        :sizes => sizes.sample,
-        :date => day
-      }
-    end
+def random_product_inventory(opts)
+  dates = (opts[:from]..opts[:to])
+  data = dates.map do |day|
+    { :date => day, :sales => Random.rand(100) }
   end
-
-  trans
+  data
 end
-
 
