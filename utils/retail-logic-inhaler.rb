@@ -47,26 +47,40 @@ def read_dbf (file)
   return DBF::Table . new (file) if File . exists? file
 end
 
-if options[:dry] == false
-# 2. connect
-  HOST = "localhost" if ! defined? HOST
-  USER = "test" if ! defined? USER
-  PASS = "test" if ! defined? PASS
-  options[:db] = "stussy_test" if options[:db].nil?
+HOST = "localhost" if ! defined? HOST
+USER = "test" if ! defined? USER
+PASS = "test" if ! defined? PASS
+options[:db] = "stussy_test" if options[:db].nil?
+STR_SZ = 100
 
+def connect_and_update_db (table_hash, options)
+  return if options[:db].nil?
+
+  puts "about to connect to db: #{options[:db]} at host: #{HOST}"
   # connect to database
   con = {}
   begin
     con = Mysql.new HOST, USER, PASS
-
+    puts con
+   
     # if DB does not exist, create it
-    con.query "CREATE DATABASE #{DB}" if ! con.list_dbs.include? DB
+    con.query "CREATE DATABASE #{options[:db]}" if ! con.list_dbs.include? options[:db]
 
-    con.query "USE #{DB}"
+    con.query "USE #{options[:db]}"
 
-    con.query("CREATE TABLE IF NOT EXISTS Transactions(Id INT PRIMARY KEY AUTO_INCREMENT, Name VARCHAR(#{STR_SZ}), Size VARCHAR(#{STR_SZ}), Color VARCHAR(#{STR_SZ}), Store INT, Date  DATE, Discount FLOAT, OrigPrice FLOAT, Type VARCHAR(#{STR_SZ}), Sku VARCHAR(#{STR_SZ}))")
+    con.query("CREATE TABLE IF NOT EXISTS Transactions(Id INT PRIMARY KEY AUTO_INCREMENT, Name VARCHAR(#{STR_SZ}), Size VARCHAR(#{STR_SZ}), Color VARCHAR(#{STR_SZ}), Store VARCHAR(#{STR_SZ}), Date  DATE, Discount VARCHAR(#{STR_SZ}), OrigPrice VARCHAR(#{STR_SZ}), Type VARCHAR(#{STR_SZ}), Sku VARCHAR(#{STR_SZ}))")
+
+    print "starting db updates, one row at a time, prepare to wait..."
+
+    table_hash . each_pair do |key, value|
+      con.query("INSERT INTO Transactions(Name, Size, Color, Store, Date, Discount, OrigPrice, Sku) VALUES (\'#{value[:NAME]}\', \'#{value[:SIZE]}\', \'#{value[:COLOR]}\', \'#{value[:STORE]}\', \'#{value[:DATE]}\', \'#{value[:DISCOUNT]}\', \'#{value[:PRICE]}\', \'#{value[:SKU]}\')")
+
+      print "."
+    end
+    print "done.\n"
+
   rescue Mysql::Error => e
-    puts e.errno
+    puts "Error connecting and using, errno #{e.errno}"
     puts e.error
   end
 end
@@ -159,8 +173,10 @@ puts "will read the following files: #{FULL_PATHS}"
 combined_table = compute_join options
 
 
+# test_table = Hash.new
 
+# test_table[1] = {:NAME => "a", :COLOR => "b", :SIZE => "c", :PRICE => "1.0", :DISCOUNT => "2.0", :SKU => "001a", :DATE => "2013-02-02"}
+# test_table[2] = {:NAME => "a", :COLOR => "b", :SIZE => "c", :PRICE => "1.0", :DISCOUNT => "2.0", :SKU => "001a", :DATE => "2013-02-02"}
+# test_table[3] = {:NAME => "a", :COLOR => "b", :SIZE => "c", :PRICE => "1.0", :DISCOUNT => "2.0", :SKU => "001a", :DATE => "2013-02-02"}
 
-
-
-
+connect_and_update_db combined_table, options
